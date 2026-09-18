@@ -1,0 +1,4 @@
+アプリ名: Image Stitcher（画像結合ツール）
+種別: フロントエンドのみ（バックエンドID・データ保存なし）
+構成: index.html / style.css / script.js
+GitHubリポジトリURL: https://github.com/noctlabo/image-stitcher

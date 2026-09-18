@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Stitcher（画像結合ツール）</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Vue 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <!-- SortableJS CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+  <!-- JSZip CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- DragSelect CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dragselect/2.7.2/ds.min.js"></script>
+  <!-- 独自スタイルシート -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen antialiased">
+  <div id="app" class="max-w-4xl mx-auto px-4 py-8">
+    <!-- タブUI -->
+    <div class="flex justify-center border-b border-gray-200 mb-6">
+      <button
+        @click="currentTab = 'vertical'"
+        :class="['px-6 py-3 font-medium text-sm transition-colors border-b-2', currentTab === 'vertical' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']"
+      >
+        縦向き結合 (Vertical)
+      </button>
+      <button
+        @click="currentTab = 'horizontal'"
+        :class="['px-6 py-3 font-medium text-sm transition-colors border-b-2', currentTab === 'horizontal' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']"
+      >
+        横向き結合 (Horizontal)
+      </button>
+    </div>
+
+    <!-- ヘッダー -->
+    <header class="mb-8 text-center">
+      <h1 class="text-3xl font-bold text-gray-900 mb-2">
+        {{ currentTab === 'vertical' ? 'Vertical Image Stitcher' : 'Horizontal Image Stitcher' }}
+      </h1>
+      <p class="text-gray-600">
+        {{ currentTab === 'vertical' ? '複数の画像を製作日順に自動で並べ、縦1枚の高画質画像に結合します。' : '複数の画像を製作日順に自動で並べ、横1枚の高画質画像に結合します。' }}
+      </p>
+    </header>
+
+    <main class="space-y-6">
+      <!-- 画像アップロードエリア -->
+      <section
+        class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-white hover:border-blue-500 transition-colors cursor-pointer"
+        @dragover.prevent="onDragOver"
+        @dragleave.prevent="onDragLeave"
+        @drop.prevent="onDrop"
+        @click="triggerFileInput"
+        :class="{ 'border-blue-500 bg-blue-50': isDragging }"
+      >
+        <input
+          type="file"
+          ref="fileInput"
+          class="hidden"
+          multiple
+          accept="image/*"
+          @change="onFileSelect"
+        >
+        <div class="flex flex-col items-center justify-center space-y-3">
+          <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+          </svg>
+          <p class="text-gray-700 font-medium">画像をドラッグ＆ドロップ、またはクリックしてファイルを選択</p>
+          <p class="text-xs text-gray-500">複数選択に対応（自動で製作日順に並び替えられます）</p>
+        </div>
+      </section>
+
+      <!-- コントロールエリア & 画像リスト -->
+      <div v-if="totalImagesCount > 0" class="space-y-6">
+        <!-- 結合設定・操作ボタン -->
+        <section class="bg-white p-4 rounded-lg shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="flex flex-wrap items-center gap-6">
+            <div class="flex items-center space-x-4">
+              <span class="text-sm font-medium text-gray-700">保存形式:</span>
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="radio" v-model="selectedFormat" value="png" class="text-blue-600 focus:ring-blue-500">
+                <span class="ml-1 text-sm text-gray-700">PNG</span>
+              </label>
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="radio" v-model="selectedFormat" value="jpg" class="text-blue-600 focus:ring-blue-500">
+                <span class="ml-1 text-sm text-gray-700">JPG</span>
+              </label>
+            </div>
+
+            <!-- 横向き結合時のみ表示される結合順序設定 -->
+            <div v-if="currentTab === 'horizontal'" class="flex flex-wrap items-center gap-4">
+              <div class="flex items-center space-x-4">
+                <span class="text-sm font-medium text-gray-700">結合順序:</span>
+                <label class="inline-flex items-center cursor-pointer">
+                  <input type="radio" v-model="horizontalDirection" value="ltr" class="text-blue-600 focus:ring-blue-500">
+                  <span class="ml-1 text-sm text-gray-700">①▶②（左から右）</span>
+                </label>
+                <label class="inline-flex items-center cursor-pointer">
+                  <input type="radio" v-model="horizontalDirection" value="rtl" class="text-blue-600 focus:ring-blue-500">
+                  <span class="ml-1 text-sm text-gray-700">②◀①（右から左）</span>
+                </label>
+              </div>
+
+              <!-- 横向き結合時の装飾設定 -->
+              <div class="flex flex-wrap items-center gap-4 border-l border-gray-200 pl-4">
+                <span class="text-sm font-medium text-gray-700">画像装飾:</span>
+                <label class="inline-flex items-center cursor-pointer">
+                  <input type="radio" v-model="decorationType" value="none" class="text-blue-600 focus:ring-blue-500">
+                  <span class="ml-1 text-sm text-gray-700">なし</span>
+                </label>
+                <label class="inline-flex items-center cursor-pointer">
+                  <input type="radio" v-model="decorationType" value="number" class="text-blue-600 focus:ring-blue-500">
+                  <span class="ml-1 text-sm text-gray-700">番号を振る</span>
+                </label>
+                <label class="inline-flex items-center cursor-pointer">
+                  <input type="radio" v-model="decorationType" value="triangle" class="text-blue-600 focus:ring-blue-500">
+                  <span class="ml-1 text-sm text-gray-700">三角マークをつける</span>
+                </label>
+
+                <!-- 番号付与時の詳細設定 -->
+                <div v-if="decorationType === 'number'" class="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded border border-gray-200 text-xs">
+                  <div class="flex items-center space-x-2">
+                    <span class="text-gray-500 font-medium">対象:</span>
+                    <label class="inline-flex items-center cursor-pointer">
+                      <input type="radio" v-model="numberTarget" value="all" class="text-blue-600 focus:ring-blue-500">
+                      <span class="ml-1 text-gray-700">すべてに振る</span>
+                    </label>
+                    <label class="inline-flex items-center cursor-pointer">
+                      <input type="radio" v-model="numberTarget" value="first" class="text-blue-600 focus:ring-blue-500">
+                      <span class="ml-1 text-gray-700">①番（最初の画像）だけ振る</span>
+                    </label>
+                  </div>
+
+                  <div class="flex items-center space-x-1 border-l border-gray-300 pl-3">
+                    <span class="text-gray-500 font-medium">サイズ:</span>
+                    <input type="number" v-model.number="numberSize" min="5" max="30" class="w-12 px-1 py-0.5 border rounded text-center text-xs">
+                    <span class="text-gray-500">px</span>
+                  </div>
+
+                  <div class="flex items-center space-x-2 border-l border-gray-300 pl-3">
+                    <span class="text-gray-500 font-medium">文字色:</span>
+                    <label class="inline-flex items-center cursor-pointer">
+                      <input type="radio" v-model="numberingColor" value="white" class="text-blue-600 focus:ring-blue-500">
+                      <span class="ml-1 text-gray-700">白</span>
+                    </label>
+                    <label class="inline-flex items-center cursor-pointer">
+                      <input type="radio" v-model="numberingColor" value="black" class="text-blue-600 focus:ring-blue-500">
+                      <span class="ml-1 text-gray-700">黒</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- 三角マーク選択時の詳細設定 -->
+                <div v-if="decorationType === 'triangle'" class="flex items-center space-x-3 bg-gray-50 p-2 rounded border border-gray-200 text-xs">
+                  <div class="flex items-center space-x-1">
+                    <span class="text-gray-500 font-medium">サイズ:</span>
+                    <input type="number" v-model.number="triangleSize" min="5" max="100" class="w-12 px-1 py-0.5 border rounded text-center text-xs">
+                    <span class="text-gray-500">px</span>
+                  </div>
+                  <div class="flex items-center space-x-2 border-l border-gray-300 pl-3">
+                    <span class="text-gray-500 font-medium">マーク色:</span>
+                    <input type="color" v-model="triangleColor" class="w-6 h-6 border-0 rounded cursor-pointer p-0 bg-transparent">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button
+              @click="addGroup"
+              class="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2.5 rounded-lg transition-colors flex items-center justify-center space-x-1"
+            >
+              <span>+ 新しい分割を追加</span>
+            </button>
+            <button
+              @click="stitchImages"
+              :disabled="isProcessing"
+              class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
+            >
+              <span v-if="isProcessing">結合処理中...</span>
+              <span v-else>画像を結合してプレビュー</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- 画像グループ（分割）リストエリア -->
+        <section class="space-y-6 image-list-container">
+          <div v-for="(group, groupIndex) in imageGroups" :key="groupIndex" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+              <h2 class="text-sm font-semibold text-gray-700">分割 {{ groupIndex + 1 }} ({{ group.length }}枚)</h2>
+              <button
+                v-if="imageGroups.length > 1"
+                @click="removeGroup(groupIndex)"
+                class="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+              >
+                グループを削除
+              </button>
+            </div>
+            <div
+              ref="sortableLists"
+              :data-group-index="groupIndex"
+              class="space-y-3 group-sortable-list"
+            >
+              <div
+                v-for="(img, imgIndex) in group"
+                :key="img.id"
+                class="bg-white p-3 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between gap-4 handle-item ds-selectable"
+              >
+                <div class="flex items-center space-x-3 overflow-hidden">
+                  <span class="cursor-grab text-gray-400 hover:text-gray-600 p-1">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
+                    </svg>
+                  </span>
+                  <img
+                    :src="img.src"
+                    :alt="img.name"
+                    @click="openModal(img.src)"
+                    class="w-16 h-16 object-cover rounded border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+                  >
+                  <div class="truncate">
+                    <p class="text-sm font-medium text-gray-800 truncate">{{ img.name }}</p>
+                    <p class="text-xs text-gray-500">製作日: {{ formatDate(img.lastModified) }}</p>
+                  </div>
+                </div>
+
+                <button
+                  @click="removeImage(groupIndex, imgIndex)"
+                  class="text-gray-400 hover:text-red-500 transition-colors p-2 flex-shrink-0"
+                  title="削除"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 完成形プレビューエリア -->
+        <section v-if="stitchedImages.length > 0" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 space-y-6">
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-gray-100 pb-4">
+            <div>
+              <h2 class="text-lg font-bold text-gray-900">結合結果プレビュー</h2>
+              <p class="text-xs text-gray-500">全{{ stitchedImages.length }}枚の画像が生成されました。</p>
+            </div>
+            <button
+              v-if="stitchedImages.length > 1"
+              @click="downloadAllZip"
+              class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm"
+            >
+              <span>まとめてZIPでダウンロード</span>
+            </button>
+          </div>
+
+          <div class="space-y-8">
+            <div v-for="(item, index) in stitchedImages" :key="index" class="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-gray-700">完成画像 {{ index + 1 }}</span>
+                <button
+                  @click="downloadSingleImage(item)"
+                  class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded transition-colors flex items-center space-x-1"
+                >
+                  <span>ダウンロード ({{ item.extension.toUpperCase() }})</span>
+                </button>
+              </div>
+              <div class="flex justify-center bg-white p-2 border border-gray-200 rounded overflow-auto max-h-[600px]">
+                <img :src="item.dataUrl" @click="openModal(item.dataUrl)" class="max-w-full h-auto object-contain cursor-pointer hover:opacity-95 transition-opacity">
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- 拡大表示モーダル -->
+    <div
+      v-if="previewImageUrl"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4"
+      @click.self="closeModal"
+    >
+      <div class="relative max-w-4xl max-h-full overflow-auto">
+        <button
+          @click="closeModal"
+          class="absolute top-2 right-2 bg-gray-800 text-white rounded-full p-2 hover:bg-gray-700 transition-colors"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+        <img :src="previewImageUrl" class="max-w-full max-h-[85vh] object-contain mx-auto rounded">
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
