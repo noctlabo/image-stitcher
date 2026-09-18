@@ -2,3 +2,4 @@
 種別: フロントエンドのみ（バックエンドID・データ保存なし）
 構成: index.html / style.css / script.js
 GitHubリポジトリURL: https://github.com/noctlabo/image-stitcher
+公開URL（GitHub Pages）: https://noctlabo.github.io/image-stitcher/
