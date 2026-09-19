@@ -5,6 +5,7 @@ const App = {
     // 二次元配列で画像グループ（分割）を管理
     const imageGroups = ref([[]]);
     const selectedFormat = ref('png');
+    const outputScale = ref(1); // 出力倍率 (1, 1.5, 2, 3)
     const currentTab = ref('vertical'); // 'vertical' | 'horizontal'
     const horizontalDirection = ref('rtl'); // 'ltr' (①▶②) | 'rtl' (②◀①)
     const decorationType = ref('none'); // 'none' | 'number' | 'triangle'
@@ -14,6 +15,10 @@ const App = {
     const triangleColor = ref('#ff0000'); // 三角マークの色 (デフォルト赤)
     const triangleSize = ref(14); // 三角マークのサイズ (デフォルト: 14)
     const previewImageUrl = ref(null);
+    const currentZoomScale = ref(1); // 現在の表示倍率 (1.0 = 100%)
+    const fitZoomScale = ref(1); // 画面にフィットする倍率
+    const naturalImageWidth = ref(0); // 画像の本来の幅
+    const naturalImageHeight = ref(0); // 画像の本来の高さ
     const isDragging = ref(false);
     const isProcessing = ref(false);
     const fileInput = ref(null);
@@ -107,17 +112,17 @@ const App = {
                 if (isMulti) {
                   // 削除時にインデックスがずれないよう、降順にソートして処理する
                   const oldIndices = evt.oldIndicies.map(i => i.index).sort((a, b) => b - a);
-
+                  
                   // アイテムの抽出
                   oldIndices.forEach(idx => {
                     movedItems.push(imageGroups.value[fromGroupIndex][idx]);
                   });
-
+                  
                   // 元グループから削除
                   oldIndices.forEach(idx => {
                     imageGroups.value[fromGroupIndex].splice(idx, 1);
                   });
-
+                  
                   // 降順で抽出したため逆順になっているものを元に戻す
                   movedItems.reverse();
                 } else {
@@ -250,13 +255,75 @@ const App = {
       });
     };
 
+    // モーダル表示時の画像表示計算サイズ
+    const previewImageDisplayWidth = computed(() => {
+      if (!naturalImageWidth.value || !currentZoomScale.value) return 0;
+      return Math.round(naturalImageWidth.value * currentZoomScale.value);
+    });
+
     // 拡大表示モーダル操作
-    const openModal = (src) => {
+    const openModal = async (src) => {
       previewImageUrl.value = src;
+      try {
+        const img = await loadImage(src);
+        naturalImageWidth.value = img.naturalWidth || img.width;
+        naturalImageHeight.value = img.naturalHeight || img.height;
+
+        // ウィンドウサイズに合わせて初期フィット倍率を計算（パディング分を考慮）
+        const padding = 64;
+        const availableWidth = Math.max(100, window.innerWidth - padding);
+        const availableHeight = Math.max(100, window.innerHeight - padding);
+
+        const scaleX = availableWidth / naturalImageWidth.value;
+        const scaleY = availableHeight / naturalImageHeight.value;
+
+        // 画面に収まるスケール（最大でも1.0＝100%まで）
+        fitZoomScale.value = Math.min(scaleX, scaleY, 1.0);
+        currentZoomScale.value = fitZoomScale.value;
+      } catch (e) {
+        fitZoomScale.value = 1;
+        currentZoomScale.value = 1;
+      }
     };
 
     const closeModal = () => {
       previewImageUrl.value = null;
+      currentZoomScale.value = 1;
+      fitZoomScale.value = 1;
+      naturalImageWidth.value = 0;
+      naturalImageHeight.value = 0;
+    };
+
+    const zoomIn = () => {
+      currentZoomScale.value = Math.min(5.0, Number((currentZoomScale.value + 0.15).toFixed(2)));
+    };
+
+    const zoomOut = () => {
+      currentZoomScale.value = Math.max(0.1, Number((currentZoomScale.value - 0.15).toFixed(2)));
+    };
+
+    const resetZoom = () => {
+      currentZoomScale.value = fitZoomScale.value;
+    };
+
+    // クリック時のトグル切り替え（フィット状態 ⇔ 原寸大(100%) または Fit倍率）
+    const togglePreviewZoom = () => {
+      if (Math.abs(currentZoomScale.value - fitZoomScale.value) < 0.05) {
+        // 現在フィット状態に近い場合は100%（原寸大）に拡大
+        currentZoomScale.value = 1.0;
+      } else {
+        // それ以外の場合はフィット状態に戻す
+        resetZoom();
+      }
+    };
+
+    // マウスホイールによる倍率制御
+    const handleWheel = (e) => {
+      if (e.deltaY < 0) {
+        zoomIn();
+      } else {
+        zoomOut();
+      }
     };
 
     // 画像読み込み用のPromise処理
@@ -303,9 +370,12 @@ const App = {
           let canvasHeight = 0;
           let scaledItems = [];
 
+          const scaleMultiplier = outputScale.value || 1;
+
           if (currentTab.value === 'vertical') {
-            // 縦向き結合: 最大幅を基準に各画像の高さをスケーリング
-            canvasWidth = Math.max(...loadedImages.map(img => img.width));
+            // 縦向き結合: 最大幅を基準に各画像の高さをスケーリングし倍率を適用
+            const baseWidth = Math.max(...loadedImages.map(img => img.width));
+            canvasWidth = baseWidth * scaleMultiplier;
             let currentY = 0;
 
             scaledItems = loadedImages.map(img => {
@@ -323,8 +393,9 @@ const App = {
             });
             canvasHeight = currentY;
           } else {
-            // 横向き結合: 最大高さを基準に各画像の幅をスケーリング
-            canvasHeight = Math.max(...loadedImages.map(img => img.height));
+            // 横向き結合: 最大高さを基準に各画像の幅をスケーリングし倍率を適用
+            const baseHeight = Math.max(...loadedImages.map(img => img.height));
+            canvasHeight = baseHeight * scaleMultiplier;
             let totalWidth = 0;
 
             const tempItems = loadedImages.map(img => {
@@ -399,9 +470,9 @@ const App = {
                 }
 
                 const numberText = (index + 1).toString();
-                const fontSize = Math.max(5, Math.min(30, numberSize.value || 11));
-                const radius = Math.max(8, Math.floor(fontSize * 0.9));
-                const margin = Math.max(4, Math.floor(radius * 0.6));
+                const fontSize = Math.max(5, Math.min(30, numberSize.value || 11)) * scaleMultiplier;
+                const radius = Math.max(8 * scaleMultiplier, Math.floor(fontSize * 0.9));
+                const margin = Math.max(4 * scaleMultiplier, Math.floor(radius * 0.6));
 
                 let circleX = 0;
                 let circleY = item.y + margin + radius;
@@ -432,7 +503,7 @@ const App = {
               if (decorationType.value === 'triangle') {
                 if (index !== 0) return; // 最初の画像以外はスキップ
 
-                const size = Math.max(5, triangleSize.value || 14);
+                const size = Math.max(5, triangleSize.value || 14) * scaleMultiplier;
 
                 ctx.save();
                 ctx.beginPath();
@@ -520,6 +591,7 @@ const App = {
       imageGroups,
       totalImagesCount,
       selectedFormat,
+      outputScale,
       currentTab,
       horizontalDirection,
       decorationType,
@@ -529,6 +601,9 @@ const App = {
       triangleColor,
       triangleSize,
       previewImageUrl,
+      currentZoomScale,
+      fitZoomScale,
+      previewImageDisplayWidth,
       isDragging,
       isProcessing,
       fileInput,
@@ -545,6 +620,11 @@ const App = {
       formatDate,
       openModal,
       closeModal,
+      zoomIn,
+      zoomOut,
+      resetZoom,
+      togglePreviewZoom,
+      handleWheel,
       stitchImages,
       downloadSingleImage,
       downloadAllZip
