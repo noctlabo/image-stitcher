@@ -21,14 +21,14 @@
   <div id="app" class="max-w-4xl mx-auto px-4 py-8">
     <!-- タブUI -->
     <div class="flex justify-center border-b border-gray-200 mb-6">
-      <button 
-        @click="currentTab = 'vertical'" 
+      <button
+        @click="currentTab = 'vertical'"
         :class="['px-6 py-3 font-medium text-sm transition-colors border-b-2', currentTab === 'vertical' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']"
       >
         縦向き結合 (Vertical)
       </button>
-      <button 
-        @click="currentTab = 'horizontal'" 
+      <button
+        @click="currentTab = 'horizontal'"
         :class="['px-6 py-3 font-medium text-sm transition-colors border-b-2', currentTab === 'horizontal' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']"
       >
         横向き結合 (Horizontal)
@@ -47,7 +47,7 @@
 
     <main class="space-y-6">
       <!-- 画像アップロードエリア -->
-      <section 
+      <section
         class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-white hover:border-blue-500 transition-colors cursor-pointer"
         @dragover.prevent="onDragOver"
         @dragleave.prevent="onDragLeave"
@@ -55,12 +55,12 @@
         @click="triggerFileInput"
         :class="{ 'border-blue-500 bg-blue-50': isDragging }"
       >
-        <input 
-          type="file" 
-          ref="fileInput" 
-          class="hidden" 
-          multiple 
-          accept="image/*" 
+        <input
+          type="file"
+          ref="fileInput"
+          class="hidden"
+          multiple
+          accept="image/*"
           @change="onFileSelect"
         >
         <div class="flex flex-col items-center justify-center space-y-3">
@@ -179,14 +179,14 @@
           </div>
 
           <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <button 
-              @click="addGroup" 
+            <button
+              @click="addGroup"
               class="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2.5 rounded-lg transition-colors flex items-center justify-center space-x-1"
             >
               <span>+ 新しい分割を追加</span>
             </button>
-            <button 
-              @click="stitchImages" 
+            <button
+              @click="stitchImages"
               :disabled="isProcessing"
               class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
             >
@@ -201,22 +201,24 @@
           <div v-for="(group, groupIndex) in imageGroups" :key="groupIndex" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
             <div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
               <h2 class="text-sm font-semibold text-gray-700">分割 {{ groupIndex + 1 }} ({{ group.length }}枚)</h2>
-              <button 
+              <button
                 v-if="imageGroups.length > 1"
-                @click="removeGroup(groupIndex)" 
-                class="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+                @click.stop="removeGroup(groupIndex)"
+                @touchstart.stop
+                @mousedown.stop
+                class="text-xs text-red-500 hover:text-red-700 font-medium transition-colors relative z-10"
               >
                 グループを削除
               </button>
             </div>
-            <div 
-              ref="sortableLists" 
+            <div
+              ref="sortableLists"
               :data-group-index="groupIndex"
               class="space-y-3 group-sortable-list"
             >
-              <div 
-                v-for="(img, imgIndex) in group" 
-                :key="img.id" 
+              <div
+                v-for="(img, imgIndex) in group"
+                :key="img.id"
                 class="bg-white p-3 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between gap-4 handle-item ds-selectable"
               >
                 <div class="flex items-center space-x-3 overflow-hidden">
@@ -225,9 +227,9 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
                     </svg>
                   </span>
-                  <img 
-                    :src="img.src" 
-                    :alt="img.name" 
+                  <img
+                    :src="img.src"
+                    :alt="img.name"
                     @click="openModal(img.src)"
                     class="w-16 h-16 object-cover rounded border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
                   >
@@ -237,9 +239,11 @@
                   </div>
                 </div>
 
-                <button 
-                  @click="removeImage(groupIndex, imgIndex)" 
-                  class="text-gray-400 hover:text-red-500 transition-colors p-2 flex-shrink-0"
+                <button
+                  @click.stop="removeImage(groupIndex, imgIndex)"
+                  @touchstart.stop
+                  @mousedown.stop
+                  class="text-gray-400 hover:text-red-500 transition-colors p-2 flex-shrink-0 relative z-10"
                   title="削除"
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -258,9 +262,9 @@
               <h2 class="text-lg font-bold text-gray-900">結合結果プレビュー</h2>
               <p class="text-xs text-gray-500">全{{ stitchedImages.length }}枚の画像が生成されました。</p>
             </div>
-            <button 
+            <button
               v-if="stitchedImages.length > 1"
-              @click="downloadAllZip" 
+              @click="downloadAllZip"
               class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm"
             >
               <span>まとめてZIPでダウンロード</span>
@@ -271,8 +275,8 @@
             <div v-for="(item, index) in stitchedImages" :key="index" class="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
               <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-gray-700">完成画像 {{ index + 1 }}</span>
-                <button 
-                  @click="downloadSingleImage(item)" 
+                <button
+                  @click="downloadSingleImage(item)"
                   class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded transition-colors flex items-center space-x-1"
                 >
                   <span>ダウンロード ({{ item.extension.toUpperCase() }})</span>
@@ -288,14 +292,14 @@
     </main>
 
     <!-- 拡大表示モーダル -->
-    <div 
-      v-if="previewImageUrl" 
+    <div
+      v-if="previewImageUrl"
       class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black bg-opacity-75 p-4 select-none"
       @click.self="closeModal"
       @wheel.prevent="handleWheel"
     >
-      <button 
-        @click="closeModal" 
+      <button
+        @click="closeModal"
         class="fixed top-4 right-4 z-10 bg-gray-800 text-white rounded-full p-2 hover:bg-gray-700 transition-colors shadow-lg"
         title="閉じる"
       >
@@ -307,8 +311,8 @@
       <!-- 画像スクロール表示エリア -->
       <div class="w-full h-full overflow-auto flex items-center justify-center p-4" @click.self="closeModal">
         <div class="m-auto flex items-center justify-center min-w-min min-h-min">
-          <img 
-            :src="previewImageUrl" 
+          <img
+            :src="previewImageUrl"
             @click="togglePreviewZoom"
             :style="{ width: previewImageDisplayWidth ? previewImageDisplayWidth + 'px' : 'auto', maxWidth: 'none', maxHeight: 'none' }"
             class="rounded transition-all duration-100 cursor-pointer object-contain block shadow-2xl"

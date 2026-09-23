@@ -90,6 +90,8 @@ const App = {
             group: 'image-stitcher-group',
             animation: 150,
             handle: '.handle-item',
+            filter: 'button', // ボタン要素でのドラッグを無効化
+            preventOnFilter: false, // フィルタ対象要素のネイティブイベント（クリック等）をブロックしない
             multiDrag: true, // 複数ドラッグ有効化
             selectedClass: 'selected', // DragSelectと連携するクラス名
             fallbackTolerance: 3, // クリックや矩形選択と競合しにくくするための閾値
@@ -112,17 +114,17 @@ const App = {
                 if (isMulti) {
                   // 削除時にインデックスがずれないよう、降順にソートして処理する
                   const oldIndices = evt.oldIndicies.map(i => i.index).sort((a, b) => b - a);
-                  
+
                   // アイテムの抽出
                   oldIndices.forEach(idx => {
                     movedItems.push(imageGroups.value[fromGroupIndex][idx]);
                   });
-                  
+
                   // 元グループから削除
                   oldIndices.forEach(idx => {
                     imageGroups.value[fromGroupIndex].splice(idx, 1);
                   });
-                  
+
                   // 降順で抽出したため逆順になっているものを元に戻す
                   movedItems.reverse();
                 } else {
