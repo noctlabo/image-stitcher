@@ -1,4 +1,4 @@
-const { createApp, ref, computed, nextTick } = Vue;
+const { createApp, ref, computed, nextTick, watch } = Vue;
 
 const App = {
   setup() {
@@ -75,6 +75,13 @@ const App = {
     // 全画像の合計枚数を算出
     const totalImagesCount = computed(() => {
       return imageGroups.value.reduce((acc, group) => acc + group.length, 0);
+    });
+
+    // 全画像枚数が0枚になった際にプレビュー結果を自動クリア
+    watch(totalImagesCount, (newCount) => {
+      if (newCount === 0) {
+        stitchedImages.value = [];
+      }
     });
 
     // SortableJSの初期化（複数グループ間での相互移動を許可）
