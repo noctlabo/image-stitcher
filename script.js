@@ -559,6 +559,11 @@ const App = {
       }
     };
 
+    // プレビュー結果の削除（クリア）
+    const clearPreview = () => {
+      stitchedImages.value = [];
+    };
+
     // 単一完成画像のダウンロード
     const downloadSingleImage = (item) => {
       const link = document.createElement('a');
@@ -636,7 +641,8 @@ const App = {
       handleWheel,
       stitchImages,
       downloadSingleImage,
-      downloadAllZip
+      downloadAllZip,
+      clearPreview
     };
   }
 };
