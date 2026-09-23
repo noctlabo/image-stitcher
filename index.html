@@ -262,12 +262,12 @@
               <h2 class="text-lg font-bold text-gray-900">結合結果プレビュー</h2>
               <p class="text-xs text-gray-500">全{{ stitchedImages.length }}枚の画像が生成されました。</p>
             </div>
-            <div class="flex gap-2 w-full sm:w-auto">
+            <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <button
                 @click="clearPreview"
-                class="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-5 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 text-sm"
+                class="w-full sm:w-auto bg-red-50 hover:bg-red-100 text-red-600 font-medium px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-1 text-sm border border-red-200"
               >
-                <span>プレビューをクリア</span>
+                <span>プレビューを削除</span>
               </button>
               <button
                 v-if="stitchedImages.length > 1"
